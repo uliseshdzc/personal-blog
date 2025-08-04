@@ -17,17 +17,14 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-
-    - name: Create service_account.json from secret
-      run: echo "${{ secrets.SERVICE_ACCOUNT_KEY }}" > build/service_account.json
-
-    - name: Set BLOG_FOLDER_ID as environment variable
-      run: echo "BLOG_FOLDER_ID=${{ secrets.BLOG_FOLDER_ID }}" >> $GITHUB_ENV
-
+        
     - name: Install Python dependencies
       run: pip install -r build/requirements.txt
 
     - name: Fetch content from Google Drive
+      env:
+        BLOG_FOLDER_ID: ${{ secrets.BLOG_FOLDER_ID }}
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
       run: python build/fetch_content.py
 
     - name: Set up Hugo
