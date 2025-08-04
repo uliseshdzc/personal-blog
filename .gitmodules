@@ -1,0 +1,3 @@
+[submodule "src/themes/drishtikon"]
+	path = src/themes/drishtikon
+	url = https://github.com/kishenarayan/drishtikon.git
