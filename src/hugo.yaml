@@ -1,0 +1,44 @@
+baseURL: https://uliseshernandez.com/
+languageCode: en-us
+title: Ulises Hernández
+theme: drishtikon
+markup:
+  goldmark:
+    extensions:
+      passthrough:
+        enable: true
+        delimiters:
+          block:
+            - - \[
+              - \]
+            - - $$
+              - $$
+          inline:
+            - - \(
+              - \)
+caches:
+  images:
+    dir: :cacheDir/images
+params:
+  profilePhoto: /images/profile-photo.jpg
+  profileDescription: Hello, I'm Ulises! I am a mexican adventurer currently
+    living in Strasbourg, France. I love to read, travel and explore new
+    cultures. I'm also a huge fan of films, photography, music and dance.
+  profileUpdates: I'm creating my new blog!
+  github: https://github.com/uliseshdzc
+  email: mailto:ulises.hernandez.calzadillas@gmail.com
+  linkedin: https://www.linkedin.com/uhernandezc
+  pinterest: https://www.pinterest.com/
+  cv: /path-to-your-cv
+  math: true
+menu:
+  main:
+    - name: posts
+      url: /posts/
+      weight: 10
+    # - name: writings
+    #   url: /writings/
+    #   weight: 20
+    # - name: photos
+    #   url: /photos/
+    #   weight: 30
