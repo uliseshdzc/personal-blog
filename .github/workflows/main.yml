@@ -28,7 +28,7 @@ jobs:
       run: pip install -r build/requirements.txt
 
     - name: Fetch content from Google Drive
-      run: python build/fetch_drive_content.py
+      run: python build/fetch_content.py
 
     - name: Set up Hugo
       uses: peaceiris/actions-hugo@v2
