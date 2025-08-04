@@ -30,7 +30,7 @@ def fetch_markdown_folders_and_files(service):
 
 def download_file(service, file_id, folder, filename):
     request = service.files().get_media(fileId=file_id)
-    filepath = os.path.join(settings.content_dir, folder, filename)
+    filepath = os.path.join(CONTENT_DIR, folder, filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with io.FileIO(filepath, 'wb') as fh:
         downloader = MediaIoBaseDownload(fh, request)
