@@ -7,7 +7,7 @@ from googleapiclient.http import MediaIoBaseDownload
 from rich.progress import track
 from settings import Settings
 
-CONTENT_DIR = '../src/content'
+CONTENT_DIR = 'src/content'
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 settings = Settings()
 
