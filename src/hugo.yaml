@@ -1,4 +1,4 @@
-baseURL: https://uliseshdzc.github.io/
+baseURL: http://blog.uliseshernandez.com/
 languageCode: en-us
 title: Ulises Hernández
 theme: drishtikon
@@ -29,7 +29,7 @@ params:
   profileUpdates: I'm creating my new blog!
   github: https://github.com/uliseshdzc
   email: mailto:ulises.hernandez.calzadillas@gmail.com
-  linkedin: https://www.linkedin.com/uhernandezc
+  linkedin: https://www.linkedin.com/in/uhernandezc
   pinterest: https://www.pinterest.com/
   cv: /path-to-your-cv
   math: true
