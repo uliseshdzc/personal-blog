@@ -33,6 +33,15 @@ params:
   pinterest: https://www.pinterest.com/
   cv: /path-to-your-cv
   math: true
+
+  backgroundColor: "#2e94cd"
+  linksColor: "white"
+  textColor: "white"
+  fontFamily: "Inter"
+  tableHeaderColor: "#19618a"
+  tableContentColor: "#64b8e8"
+  tableRowHoverColor: "#19618a"
+  writingCardBackground: "#fdf1cd"
 menu:
   main:
     - name: posts
