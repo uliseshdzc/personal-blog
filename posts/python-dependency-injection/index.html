@@ -1,0 +1,295 @@
+<!doctype html><html lang=en-us><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><title>FastAPI + Injector: A simplified approach to dependency injection in Python | Ulises Hernández</title><link rel=icon href=#ZgotmplZ></link>
+<link rel=stylesheet href=../../css/styles.css><style>:root{--background-color:#2e94cd;--links-color:white;--text-color:white;--table-header-color:#19618a;--table-content-color:#64b8e8;--table-row-hover-color:#19618a;--writing-card-background:#fdf1cd;--font-family:Inter}</style><link rel=preload href=https://rsms.me/><link rel=stylesheet href=https://rsms.me/inter/inter.css><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css integrity=sha384-zh0CIslj+VczCZtlzBcjt5ppRcsAmDnRem7ESsYwWwg3m/OaJ2l4x7YBZl9Kxxib crossorigin=anonymous><script src=https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js integrity=sha384-Rma6DA2IPUwhNxmrB/7S3Tno0YY7sFu9WSYMCuulLhIqYSGZ2gKCJWIqhBWqMQfh crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js integrity=sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh crossorigin=anonymous onload=renderMathInElement(document.body) defer></script><script>document.addEventListener("DOMContentLoaded",function(){renderMathInElement(document.body,{delimiters:[{left:"[",right:"]",display:!0},{left:"$$",right:"$$",display:!0},{left:"(",right:")",display:!1}],throwOnError:!1})}),defer</script></head><body><nav class=top-nav><a href=http://blog.uliseshernandez.com/ class=site-title>Ulises Hernández</a><div class=nav-links><a href=../../posts/>posts</a></div></nav><main><div class=container><article class=single-post><header class=post-header><h1>FastAPI + Injector: A simplified approach to dependency injection in Python</h1><div class=post-meta><time>August 11, 2025</time></div></header><div class=post-content><p>Python is a <strong>dynamically</strong> typed language, which means type checking happens at runtime—unlike statically typed languages like C# or Java. This flexibility enables powerful features such as monkey patching, hot swapping, and dynamic class creation. Because of this, <strong>dependency injection (DI)</strong> is not strictly required in Python applications.</p><p>However, DI brings a formal structure to your codebase, especially when using architectural patterns like <strong>Domain-Driven Design (DDD)</strong> or <strong>Hexagonal Architecture</strong>. It promotes flexibility by allowing large parts of the code to be replaced or modified without impacting the rest of the system. It also reduces coupling, making the system less dependent on specific implementations. This, in turn, simplifies testing, as modules can be easily mocked.</p><p>For all these reasons, many developers—including myself—still choose to use DI in Python projects, particularly in web APIs.</p><p>In this article, I will share the method I use to implement <strong>dependency injection</strong> in a typical FastAPI web API. While FastAPI provides a built-in DI system (which you can read about <a href=https://fastapi.tiangolo.com/tutorial/dependencies/>here</a>), I find its syntax somewhat cumbersome. Moreover, injecting dependencies into inner layers of a DDD architecture (like the <em>domain</em> layer) is not as straightforward as it is in the API layer. Defining <em>singleton</em> objects can also be tricky.</p><p>That is why I have developed a technique that I find easier to follow, implement, and maintain—and I’m excited to share it with you.</p><h2 id=what-is-dependency-injection>What is dependency injection?</h2><p><strong>Dependency Injection (DI)</strong> is a design pattern used to implement the principle of <strong>Inversion of Control (IoC)</strong>. This principle is the last of the <strong>SOLID</strong> principles defined by Robert C. Martin, which serve as guidelines for writing scalable, maintainable, and loosely coupled code.</p><p>DI is based on two key rules:</p><ol><li><strong>&ldquo;High-level modules should not depend on low-level modules. Both should depend on abstractions.&rdquo;</strong></li><li><strong>&ldquo;Abstractions should not depend on details. Details should depend on abstractions.&rdquo;</strong></li></ol><p>Let’s break these down:</p><h3 id=rule-1-high-level-modules-should-not-depend-on-low-level-modules>Rule 1: High-level modules should not depend on low-level modules</h3><p>A <strong>low-level module</strong> is one that performs basic operations and has few or no dependencies. These modules are typically reusable and self-contained. In contrast, <strong>high-level modules</strong> encapsulate business logic and often rely on other components (like repositories, services, or external APIs) to function.</p><p>Here’s an example of code that <strong>violates</strong> this rule:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>MyDatabase</span>:
+</span></span><span style=display:flex><span>	<span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>connect</span>(self):
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;Connecting to database&#34;</span>)
+</span></span><span style=display:flex><span>	<span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>UserService</span>:
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>__init__</span>(self):
+</span></span><span style=display:flex><span>		self<span style=color:#f92672>.</span>db <span style=color:#f92672>=</span> MyDatabase() <span style=color:#75715e># &lt;-- dependency</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_user</span>(self):
+</span></span><span style=display:flex><span>		self<span style=color:#f92672>.</span>db<span style=color:#f92672>.</span>connect()
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;Fetching user data&#34;</span>)
+</span></span><span style=display:flex><span>	<span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>main</span>():
+</span></span><span style=display:flex><span>	service <span style=color:#f92672>=</span> UserService() <span style=color:#75715e># &lt;-- dependency</span>
+</span></span><span style=display:flex><span>	service<span style=color:#f92672>.</span>get_user()
+</span></span><span style=display:flex><span>	<span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> __name__ <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;__main__&#34;</span>:
+</span></span><span style=display:flex><span>    main()	
+</span></span></code></pre></div><p>In this example, <code>MyDatabase</code> is a <strong>low-level module</strong>, and <code>UserService</code> is a <strong>high-level module</strong>. The dependency is created directly inside <code>UserService</code>, which means that if we ever need to change the implementation of <code>MyDatabase</code>, we would likely have to update every class that uses it—starting with <code>UserService</code>. This tight coupling makes the system harder to maintain and evolve.</p><p>Moreover, it becomes difficult to create or mock instances of <code>UserService</code> without ensuring that <code>MyDatabase</code> is functioning correctly. This dependency chain leads to tightly coupled classes, which complicates testing and reduces flexibility.</p><p>A better approach would be to depend on an <strong>abstraction</strong>, like an interface or base class:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> abc <span style=color:#f92672>import</span> ABC, abstractmethod
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># High-level abstraction</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>IDatabase</span>(ABC):
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>connect</span>(self):
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Low-level implementation</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>MyDatabase</span>(IDatabase):
+</span></span><span style=display:flex><span>	<span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>connect</span>(self):
+</span></span><span style=display:flex><span>        print(<span style=color:#e6db74>&#34;Connecting to MySQL database&#34;</span>)
+</span></span><span style=display:flex><span>	<span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>	
+</span></span><span style=display:flex><span><span style=color:#75715e># High-level module depends on abstraction</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>UserService</span>:
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>__init__</span>(self, db: IDatabase): <span style=color:#75715e># &lt;-- abstraction dependency</span>
+</span></span><span style=display:flex><span>        self<span style=color:#f92672>.</span>db <span style=color:#f92672>=</span> db
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_user</span>(self):
+</span></span><span style=display:flex><span>        self<span style=color:#f92672>.</span>db<span style=color:#f92672>.</span>connect()
+</span></span><span style=display:flex><span>        print(<span style=color:#e6db74>&#34;Fetching user data&#34;</span>)
+</span></span><span style=display:flex><span>    <span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>        
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>main</span>():
+</span></span><span style=display:flex><span>	db <span style=color:#f92672>=</span> MySQLDatabase() <span style=color:#75715e># &lt;-- dependency</span>
+</span></span><span style=display:flex><span>	service <span style=color:#f92672>=</span> UserService(db) <span style=color:#75715e># &lt;-- dependency</span>
+</span></span><span style=display:flex><span>	service<span style=color:#f92672>.</span>get_user()
+</span></span><span style=display:flex><span>	<span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> __name__ <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;__main__&#34;</span>:
+</span></span><span style=display:flex><span>    main()	
+</span></span></code></pre></div><p>In the second example, this tight coupling is resolved. An interface <code>IDatabase</code> is introduced, allowing <code>UserService</code> to be completely detached from the concrete implementation of <code>MyDatabase</code>. Now, all dependencies are injected at the highest level—typically in the <code>main</code> function or application setup—while the modules themselves depend only on abstractions. This structure ensures that the modules are <strong>loosely coupled</strong>, satisfying the <strong>first rule</strong> of dependency injection.</p><h3 id=rule-2-abstractions-should-not-depend-on-details>Rule 2: Abstractions should not depend on details</h3><p>This rule emphasizes that an abstraction should define <strong>what</strong> a component does, not <strong>how</strong> it does it. The implementation details should be encapsulated in concrete classes, not exposed or handled by the abstraction itself.</p><p>If an interface or abstract class starts to include logic or assumptions about specific implementations, it becomes tightly coupled to those details. This violates the principle and risks cascading changes across the system whenever a single implementation changes.</p><p>Let’s look at an example to illustrate this:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> abc <span style=color:#f92672>import</span> ABC, abstractmethod
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ITransportationMode</span>(ABC):
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_max_speed</span>(self):
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_wheels_quantity</span>(self):
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Car</span>(ITransportationMode):
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_max_speed</span>(self):
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#ae81ff>200</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_wheels_quantity</span>(self): <span style=color:#75715e># &lt;-- It works here</span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#ae81ff>4</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Horse</span>(ITransportationMode): 
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_max_speed</span>(self):
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#ae81ff>70</span>
+</span></span><span style=display:flex><span>		
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_wheels_quantity</span>(self): <span style=color:#75715e># &lt;-- It does not work here anymore</span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>pass</span>
+</span></span></code></pre></div><p>This example highlights a common mistake: the method <code>get_wheels_quantity</code> is defined in the interface <code>ITransportationMode</code>, but it only makes sense for certain implementations like <code>Car</code>. For others, like <code>Horse</code>, it’s irrelevant or undefined, leading to awkward or meaningless implementations.</p><p>This violates the second rule of dependency injection: <strong>abstractions should not depend on details</strong>. The interface should only define behavior that is common and meaningful to all its implementations. Including methods that only apply to some subclasses forces unnecessary coupling and breaks the abstraction.</p><p>To fix this, we can split the abstraction into more specific interfaces:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> abc <span style=color:#f92672>import</span> ABC, abstractmethod
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ITransportationMode</span>(ABC):
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_max_speed</span>(self):
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span><span style=display:flex><span>		
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>IVehicleWithWheels</span>(ITransportationMode):
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_wheels_quantity</span>(self):
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Car</span>(IVehicleWithWheels):
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_max_speed</span>(self):
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#ae81ff>200</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_wheels_quantity</span>(self):
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#ae81ff>4</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Horse</span>(ITransportationMode): 
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_max_speed</span>(self):
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#ae81ff>70</span>
+</span></span></code></pre></div><p>The new code provides much more flexibility because when a modification occurs, it only affects the relevant classes. This improves modularization and reduces coupling. Additionally, the responsibilities of each module are clearly defined.</p><h2 id=dependency-injection-in-python>Dependency injection in Python</h2><p>Now, I will walk you through a simple web API to demonstrate my methodology for implementing <strong>Inversion of Control (IoC)</strong> in Python. You can check out the full project on GitHub <a href=https://github.com/uliseshdzc/fastapi-dependency-injection>here</a>.</p><p>To achieve this, I use two main libraries for dependency injection, one for managing application settings, and of course, FastAPI itself:</p><table><thead><tr><th>Type</th><th>Library</th><th>Version used</th></tr></thead><tbody><tr><td>DI</td><td>FastAPI Injector</td><td>0.8.0</td></tr><tr><td>DI</td><td>Injector</td><td>0.22.0</td></tr><tr><td>Settings</td><td>Pydantic Settings</td><td>2.10.1</td></tr><tr><td>API</td><td>FastAPI</td><td>0.116.1</td></tr></tbody></table><p>The application is a simple API that returns properties of various polygons. It is structured following the principles of <strong>Domain-Driven Design (DDD)</strong>:</p><pre tabindex=0><code>fastapi-dependency-injection
+│
+├── polygons/
+│	│
+│	├── api/
+│	│   ├── controllers/
+|	│   │   └── polygons.py
+|	│   ├── app.py
+|	│   └── dependency_injection.py
+|	│   
+|	├── domain/
+|	│   ├── interfaces/
+|	│   │   ├── polygon_interface.py
+|	│   │   └── settings_interface.py
+|	│   ├── models/
+|	│   │   ├── square.py
+|	│   │   └── triangle.py
+|	│   └── settings/
+|	|
+|	├── __init__.py
+|	└── __main__.py
+|
+├── .env
+└── requirements.txt
+</code></pre><h3 id=settings-injection>Settings injection</h3><p>In my experience, one of the key benefits of using dependency injection is the ability to inject <strong>application settings</strong>. Typically, a settings class is used across multiple modules. Without DI, you would need to instantiate it every time it is required, which leads to repetitive and less maintainable code.</p><p>Moreover, settings values—such as configuration parameters—should remain constant throughout the application&rsquo;s lifetime. This makes them ideal candidates for a <strong>singleton</strong> pattern.</p><p>Fortunately, this is easy to implement using <code>pydantic</code> and <code>injector</code>. Let’s start by creating a <code>settings.py</code> file that reads the polygon’s side length from a <code>.env</code> file.</p><p><code>.env</code>:</p><pre tabindex=0><code>SIDE_LENGTH=5
+</code></pre><p><code>settings.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> pydantic_settings <span style=color:#f92672>import</span> BaseSettings, SettingsConfigDict
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Settings</span>(BaseSettings):
+</span></span><span style=display:flex><span>    model_config <span style=color:#f92672>=</span> SettingsConfigDict(env_file<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;.env&#34;</span>, extra<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;ignore&#34;</span>)
+</span></span><span style=display:flex><span>    side_length: float
+</span></span></code></pre></div><p>Now comes the interesting part. To apply <strong>inversion of control</strong>, we need an interface that acts as a contract between the modules that require settings and the settings implementation itself. This interface ensures that any class inheriting from it must implement the <code>get_side_length</code> method. That way, any object using <code>ISettings</code> can rely on the presence of this method.</p><p><code>settings_interface.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> abc <span style=color:#f92672>import</span> ABC, abstractmethod
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>ISettings</span>(ABC):
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_side_length</span>(self) <span style=color:#f92672>-&gt;</span> float:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span></code></pre></div><p>This is the final declaration of the <code>Settings</code> class. It inherits from <code>ISettings</code> and implements the <code>get_side_length</code> method. Notice the use of the <code>@singleton</code> decorator from the <code>injector</code> library—this ensures that only one instance of the settings class is created and shared throughout the application, following the <strong>singleton pattern</strong>.</p><p><code>settings.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> injector <span style=color:#f92672>import</span> singleton
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> pydantic_settings <span style=color:#f92672>import</span> BaseSettings, SettingsConfigDict
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.interfaces.settings_interface <span style=color:#f92672>import</span> ISettings
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@singleton</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Settings</span>(BaseSettings, ISettings):
+</span></span><span style=display:flex><span>    model_config <span style=color:#f92672>=</span> SettingsConfigDict(env_file<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;.env&#34;</span>, extra<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;ignore&#34;</span>)
+</span></span><span style=display:flex><span>    side_length: float
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_side_length</span>(self) <span style=color:#f92672>-&gt;</span> float:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> self<span style=color:#f92672>.</span>side_length
+</span></span></code></pre></div><h3 id=polymorphism>Polymorphism</h3><p>Next, let’s define the interface for polygons. This interface includes three methods that describe the behavior expected from any polygon implementation.</p><p><code>polygons_interface.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> abc <span style=color:#f92672>import</span> ABC, abstractmethod
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>IPolygon</span>(ABC):
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_area</span>(self, side_length: float) <span style=color:#f92672>-&gt;</span> float:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_perimeter</span>(self, side_length: float) <span style=color:#f92672>-&gt;</span> float:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@abstractmethod</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_number_of_sides</span>(self) <span style=color:#f92672>-&gt;</span> int:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>raise</span> <span style=color:#a6e22e>NotImplementedError</span>
+</span></span></code></pre></div><p>Now, let’s implement a class that inherits from <code>IPolygon</code>. The <code>Square</code> class provides concrete implementations for all three methods. It requires access to the <code>side_length</code> setting, which is injected via the constructor using the <code>ISettings</code> interface. Without <strong>dependency injection</strong>, we would need to manually instantiate the settings class each time it is needed, leading to repetitive code and making configuration changes harder to manage across the application. For example, just imagine that we decide to change the <code>side_length</code> from 5 to 10; we would have to update every place where <code>Settings</code> is instantiated manually. By injecting <code>ISettings</code>, we delegate the responsibility of providing the dependency to the injector.</p><blockquote><p>:important: It is necessary to use the <code>@inject</code> decorator to indicate the library <code>injector</code> that the class must be injected.</p></blockquote><p><code>square.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> injector <span style=color:#f92672>import</span> inject
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.interfaces.polygon_interface <span style=color:#f92672>import</span> IPolygon
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.interfaces.settings_interface <span style=color:#f92672>import</span> ISettings
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Square</span>(IPolygon):
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@inject</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>__init__</span>(self, settings: ISettings):
+</span></span><span style=display:flex><span>	    <span style=color:#75715e># If settings were not injected, I would have to create a new instance</span>
+</span></span><span style=display:flex><span>	    <span style=color:#75715e># self.settings = Settings(side_length=5)	    </span>
+</span></span><span style=display:flex><span>        self<span style=color:#f92672>.</span>settings <span style=color:#f92672>=</span> settings  
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_area</span>(self) <span style=color:#f92672>-&gt;</span> float:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> self<span style=color:#f92672>.</span>settings<span style=color:#f92672>.</span>get_side_length() <span style=color:#f92672>**</span> <span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_perimeter</span>(self) <span style=color:#f92672>-&gt;</span> float:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>4</span> <span style=color:#f92672>*</span> self<span style=color:#f92672>.</span>settings<span style=color:#f92672>.</span>get_side_length()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_number_of_sides</span>(self) <span style=color:#f92672>-&gt;</span> int:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>4</span>
+</span></span></code></pre></div><p>A similar implementation is provided for the <code>Triangle</code> class:</p><p><code>triangle.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> injector <span style=color:#f92672>import</span> inject
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.interfaces.polygon_interface <span style=color:#f92672>import</span> IPolygon
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.interfaces.settings_interface <span style=color:#f92672>import</span> ISettings
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Triangle</span>(IPolygon):
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>@inject</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>__init__</span>(self, settings: ISettings):
+</span></span><span style=display:flex><span>        self<span style=color:#f92672>.</span>settings <span style=color:#f92672>=</span> settings
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_area</span>(self) <span style=color:#f92672>-&gt;</span> float:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>0.5</span> <span style=color:#f92672>*</span> self<span style=color:#f92672>.</span>settings<span style=color:#f92672>.</span>get_side_length() <span style=color:#f92672>**</span> <span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_perimeter</span>(self) <span style=color:#f92672>-&gt;</span> float:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>3</span> <span style=color:#f92672>*</span> self<span style=color:#f92672>.</span>settings<span style=color:#f92672>.</span>get_side_length()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_number_of_sides</span>(self) <span style=color:#f92672>-&gt;</span> int:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>3</span>
+</span></span></code></pre></div><h3 id=class-binding>Class binding</h3><p>To complete the setup, we need to define how interfaces are bound to their implementations. This is done in the <code>dependency_injection.py</code> file, located at the top level of the application. Using the <code>injector</code> library, the binding process is straightforward:</p><ol><li>Create the <code>injector = Injector()</code> instance.</li><li>Bind interfaces to their concrete classes.</li><li>Optionally define a <a href=https://injector.readthedocs.io/en/latest/scopes.html>scope</a>, such as singleton, either via decorators or directly in the binder.</li></ol><p><code>dependency_injection.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> random  
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> injector <span style=color:#f92672>import</span> Injector
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.interfaces.polygon_interface <span style=color:#f92672>import</span> IPolygon
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.interfaces.settings_interface <span style=color:#f92672>import</span> ISettings
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.models.square <span style=color:#f92672>import</span> Square
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.models.triangle <span style=color:#f92672>import</span> Triangle
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.settings.settings <span style=color:#f92672>import</span> Settings
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>injector <span style=color:#f92672>=</span> Injector()
+</span></span><span style=display:flex><span>injector<span style=color:#f92672>.</span>binder<span style=color:#f92672>.</span>bind(IPolygon, random<span style=color:#f92672>.</span>choice([Square, Triangle]))
+</span></span><span style=display:flex><span>injector<span style=color:#f92672>.</span>binder<span style=color:#f92672>.</span>bind(ISettings, Settings)
+</span></span></code></pre></div><p>This configuration binds <code>ISettings</code> to the <code>Settings</code> class, ensuring that any class requiring <code>ISettings</code> receives the singleton instance. For demonstration purposes, <code>IPolygon</code> is randomly bound to either <code>Square</code> or <code>Triangle</code>, showcasing how flexible and dynamic DI can be—even though this random binding is not typical in production environments.</p><h3 id=fastapi-injection>FastAPI injection</h3><p>I created a simple FastAPI application with three endpoints: <code>/random-polygon</code>, <code>/square</code> and <code>/triangle</code>.</p><p><code>__main__.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> uvicorn
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>main</span>():
+</span></span><span style=display:flex><span>    uvicorn<span style=color:#f92672>.</span>run(<span style=color:#e6db74>&#34;polygons.api.app:app&#34;</span>)
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> __name__ <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;__main__&#34;</span>:
+</span></span><span style=display:flex><span>    main()
+</span></span></code></pre></div><p>One of the key steps is integrating the injector with the FastAPI <code>app</code> object. At first glance, <code>app.py</code> looks like a typical FastAPI setup. However, the last line is crucial: the <code>attach_injector</code> function from the <code>fastapi_injector</code> library links the <code>injector</code> to the FastAPI app.</p><p><code>app.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> fastapi <span style=color:#f92672>import</span> FastAPI
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> fastapi_injector <span style=color:#f92672>import</span> attach_injector
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.api.controllers <span style=color:#f92672>import</span> polygons
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.api.dependency_injection <span style=color:#f92672>import</span> injector
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>app <span style=color:#f92672>=</span> FastAPI(
+</span></span><span style=display:flex><span>    title<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;Polygons DI example&#34;</span>,
+</span></span><span style=display:flex><span>    version<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;EXAMPLE&#34;</span>,
+</span></span><span style=display:flex><span>    description<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;API conceived to show how to implement dependency injection (DI) in Python using FastAPI.&#34;</span>,
+</span></span><span style=display:flex><span>    swagger_ui_parameters<span style=color:#f92672>=</span>{<span style=color:#e6db74>&#34;defaultModelsExpandDepth&#34;</span>: <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>},
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span>app<span style=color:#f92672>.</span>include_router(polygons<span style=color:#f92672>.</span>router)
+</span></span><span style=display:flex><span>attach_injector(app, injector)
+</span></span></code></pre></div><p>For the controller file, I now only focus in the injection of the required services in the endpoints. We do not pay attention anymore to the implementation of the other dependencies because they are all handled by the injector (this is the beauty of the <strong>dependency inversion principle</strong>).</p><p>With <code>fastapi_injector</code>, the syntax for injecting dependencies changes slightly compared to the traditional FastAPI approach.</p><h4 id=traditional-fastapi-injection>Traditional FastAPI injection:</h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> typing <span style=color:#f92672>import</span> Annotated
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> fastapi <span style=color:#f92672>import</span> Depends
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@router.get</span>(<span style=color:#e6db74>&#34;/example&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>my_endpoint</span>(
+</span></span><span style=display:flex><span>	polygon_service: Annotated[IPolygon, Depends(Square)]
+</span></span><span style=display:flex><span>):
+</span></span><span style=display:flex><span>	<span style=color:#f92672>...</span>
+</span></span></code></pre></div><p>In this approach, you must explicitly define the binding for each interface at every endpoint.</p><h4 id=withfastapi_injector>With <code>fastapi_injector</code>:</h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> fastapi_injector <span style=color:#f92672>import</span> Injected
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@router.get</span>(<span style=color:#e6db74>&#34;/example&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>my_endpoint</span>(
+</span></span><span style=display:flex><span>	polygon_service: IPolygon <span style=color:#f92672>=</span> Injected(IPolygon)
+</span></span><span style=display:flex><span>):
+</span></span></code></pre></div><p>Here, the binding is automatically resolved based on the configuration defined in <code>dependency_injection.py</code>. However, you can still override the default binding by specifying a concrete class, as shown in the controller implementation.</p><h3 id=controller-implementation>Controller implementation</h3><p><code>controllers/polygons.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> fastapi <span style=color:#f92672>import</span> APIRouter
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> fastapi_injector <span style=color:#f92672>import</span> Injected
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.interfaces.polygon_interface <span style=color:#f92672>import</span> IPolygon
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.models.square <span style=color:#f92672>import</span> Square
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> polygons.domain.models.triangle <span style=color:#f92672>import</span> Triangle
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>router <span style=color:#f92672>=</span> APIRouter(tags<span style=color:#f92672>=</span>[<span style=color:#e6db74>&#34;Polygons&#34;</span>])
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@router.get</span>(<span style=color:#e6db74>&#34;/random-polygon&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_random_polygon_information</span>(polygon_service: IPolygon <span style=color:#f92672>=</span> Injected(IPolygon)):
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> {
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;sides&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_number_of_sides(),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;area&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_area(),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;perimeter&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_perimeter(),
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@router.get</span>(<span style=color:#e6db74>&#34;/square&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_square_information</span>(polygon_service: IPolygon <span style=color:#f92672>=</span> Injected(Square)):
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> {
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;sides&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_number_of_sides(),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;area&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_area(),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;perimeter&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_perimeter(),
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span><span style=color:#a6e22e>@router.get</span>(<span style=color:#e6db74>&#34;/triangle&#34;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_triangle_information</span>(polygon_service: IPolygon <span style=color:#f92672>=</span> Injected(Triangle)):
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> {
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;sides&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_number_of_sides(),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;area&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_area(),
+</span></span><span style=display:flex><span>        <span style=color:#e6db74>&#34;perimeter&#34;</span>: polygon_service<span style=color:#f92672>.</span>get_perimeter(),
+</span></span><span style=display:flex><span>    }
+</span></span></code></pre></div><p>For the <code>/random-polygon</code> endpoint, the implementation used will be randomly selected between <code>Square</code> and <code>Triangle</code>, based on the binding defined in <code>dependency_injection.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span>injector<span style=color:#f92672>.</span>binder<span style=color:#f92672>.</span>bind(IPolygon, random<span style=color:#f92672>.</span>choice([Square, Triangle]))
+</span></span></code></pre></div><p>For the <code>/square</code> and <code>/triangle</code> endpoints, we explicitly specify which implementation to inject.</p><p>And just like that, we’ve built a FastAPI application with clean, maintainable <strong>dependency injection</strong> using <code>injector</code> and <code>fastapi_injector</code>.</p><h2 id=conclusion>Conclusion</h2><p>The <strong>Dependency Inversion Principle (DIP)</strong> offers significant advantages in terms of modularization and reducing coupling. Even though Python is a dynamically typed language, applying DIP can greatly enhance the structure and maintainability of complex applications. It promotes scalability and simplifies testing by allowing components to be easily swapped or mocked.</p><p>In this article, I presented a straightforward methodology for implementing dependency injection in a FastAPI application using the <code>injector</code> and <code>fastapi_injector</code> libraries. This approach is well-suited for larger, more complex projects and serves as a solid foundation for clean and scalable Python development.</p><p>I encourage you to put the <strong>SOLID</strong> principles into practice—especially the <strong>DIP</strong>—to improve the quality, flexibility, and testability of your code.</p></div></article></div></main><footer><div class=site-footer><div class=footer-links><a href=https://github.com/uliseshdzc target=_blank><span class="icon github-icon"></span>
+</a><a href=mailto:ulises.hernandez.calzadillas@gmail.com><span class="icon email-icon"></span>
+</a><a href=https://www.linkedin.com/in/uhernandezc><span class="icon linkedin-icon"></span>
+</a><a href=https://www.pinterest.com/><span class="icon pinterest-icon"></span>
+</a><a href=../../path-to-your-cv><span class="icon cv-icon"></span></a></div></div></footer></body></html>
