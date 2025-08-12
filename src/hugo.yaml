@@ -41,15 +41,16 @@ params:
   tableHeaderColor: "#19618a"
   tableContentColor: "#64b8e8"
   tableRowHoverColor: "#19618a"
-  writingCardBackground: "#fdf1cd"
+  writingCardBackground: "#64b8e8"
+
 menu:
   main:
     - name: posts
       url: /posts/
       weight: 10
-    # - name: writings
-    #   url: /writings/
-    #   weight: 20
+    - name: writings
+      url: /writings/
+      weight: 20
     # - name: photos
     #   url: /photos/
     #   weight: 30
