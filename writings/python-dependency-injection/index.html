@@ -102,32 +102,32 @@
 </span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Horse</span>(ITransportationMode): 
 </span></span><span style=display:flex><span>	<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_max_speed</span>(self):
 </span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#ae81ff>70</span>
-</span></span></code></pre></div><p>The new code provides much more flexibility because when a modification occurs, it only affects the relevant classes. This improves modularization and reduces coupling. Additionally, the responsibilities of each module are clearly defined.</p><h2 id=dependency-injection-in-python>Dependency injection in Python</h2><p>Now, I will walk you through a simple web API to demonstrate my methodology for implementing <strong>Inversion of Control</strong> (<strong>IoC</strong>) in Python. You can check out the full project on GitHub <a href=https://github.com/uliseshdzc/fastapi-dependency-injection>here</a>.</p><p>To achieve this, I use two main libraries for dependency injection, one for managing application settings, and of course, FastAPI itself:</p><table><thead><tr><th>Type</th><th>Library</th><th>Version used</th></tr></thead><tbody><tr><td>DI</td><td>FastAPI Injector</td><td>0.8.0</td></tr><tr><td>DI</td><td>Injector</td><td>0.22.0</td></tr><tr><td>Settings</td><td>Pydantic Settings</td><td>2.10.1</td></tr><tr><td>API</td><td>FastAPI</td><td>0.116.1</td></tr></tbody></table><p>The application is a simple API that returns properties of various polygons. It is structured following the principles of <strong>Domain-Driven Design</strong> (<strong>DDD</strong>):</p><pre tabindex=0><code>fastapi-dependency-injection
-│
-├── polygons/
-│	│
-│	├── api/
-│	│   ├── controllers/
-|	│   │   └── polygons.py
-|	│   ├── app.py
-|	│   └── dependency_injection.py
-|	│   
-|	├── domain/
-|	│   ├── interfaces/
-|	│   │   ├── polygon_interface.py
-|	│   │   └── settings_interface.py
-|	│   ├── models/
-|	│   │   ├── square.py
-|	│   │   └── triangle.py
-|	│   └── settings/
-|	|
-|	├── __init__.py
-|	└── __main__.py
-|
-├── .env
-└── requirements.txt
-</code></pre><h3 id=settings-injection>Settings injection</h3><p>In my experience, one of the key benefits of using dependency injection is the ability to inject <strong>application settings</strong>. Typically, a settings class is used across multiple modules. Without DI, you would need to instantiate it every time it is required, which leads to repetitive and less maintainable code.</p><p>Moreover, settings values—such as configuration parameters—should remain constant throughout the application&rsquo;s lifetime. This makes them ideal candidates for a <strong>singleton</strong> pattern.</p><p>Fortunately, this is easy to implement using <code>pydantic</code> and <code>injector</code>. Let’s start by creating a <code>settings.py</code> file that reads the polygon’s side length from a <code>.env</code> file.</p><p><code>.env</code>:</p><pre tabindex=0><code>SIDE_LENGTH=5
-</code></pre><p><code>settings.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> pydantic_settings <span style=color:#f92672>import</span> BaseSettings, SettingsConfigDict
+</span></span></code></pre></div><p>The new code provides much more flexibility because when a modification occurs, it only affects the relevant classes. This improves modularization and reduces coupling. Additionally, the responsibilities of each module are clearly defined.</p><h2 id=dependency-injection-in-python>Dependency injection in Python</h2><p>Now, I will walk you through a simple web API to demonstrate my methodology for implementing <strong>Inversion of Control</strong> (<strong>IoC</strong>) in Python. You can check out the full project on GitHub <a href=https://github.com/uliseshdzc/fastapi-dependency-injection>here</a>.</p><p>To achieve this, I use two main libraries for dependency injection, one for managing application settings, and of course, FastAPI itself:</p><table><thead><tr><th>Type</th><th>Library</th><th>Version used</th></tr></thead><tbody><tr><td>DI</td><td>FastAPI Injector</td><td>0.8.0</td></tr><tr><td>DI</td><td>Injector</td><td>0.22.0</td></tr><tr><td>Settings</td><td>Pydantic Settings</td><td>2.10.1</td></tr><tr><td>API</td><td>FastAPI</td><td>0.116.1</td></tr></tbody></table><p>The application is a simple API that returns properties of various polygons. It is structured following the principles of <strong>Domain-Driven Design</strong> (<strong>DDD</strong>):</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-env data-lang=env><span style=display:flex><span>fastapi-dependency-injection
+</span></span><span style=display:flex><span>│
+</span></span><span style=display:flex><span>├── polygons/
+</span></span><span style=display:flex><span>│	│
+</span></span><span style=display:flex><span>│	├── api/
+</span></span><span style=display:flex><span>│	│   ├── controllers/
+</span></span><span style=display:flex><span>|	│   │   └── polygons.py
+</span></span><span style=display:flex><span>|	│   ├── app.py
+</span></span><span style=display:flex><span>|	│   └── dependency_injection.py
+</span></span><span style=display:flex><span>|	│   
+</span></span><span style=display:flex><span>|	├── domain/
+</span></span><span style=display:flex><span>|	│   ├── interfaces/
+</span></span><span style=display:flex><span>|	│   │   ├── polygon_interface.py
+</span></span><span style=display:flex><span>|	│   │   └── settings_interface.py
+</span></span><span style=display:flex><span>|	│   ├── models/
+</span></span><span style=display:flex><span>|	│   │   ├── square.py
+</span></span><span style=display:flex><span>|	│   │   └── triangle.py
+</span></span><span style=display:flex><span>|	│   └── settings/
+</span></span><span style=display:flex><span>|	|
+</span></span><span style=display:flex><span>|	├── __init__.py
+</span></span><span style=display:flex><span>|	└── __main__.py
+</span></span><span style=display:flex><span>|
+</span></span><span style=display:flex><span>├── .env
+</span></span><span style=display:flex><span>└── requirements.txt
+</span></span></code></pre></div><h3 id=settings-injection>Settings injection</h3><p>In my experience, one of the key benefits of using dependency injection is the ability to inject <strong>application settings</strong>. Typically, a settings class is used across multiple modules. Without DI, you would need to instantiate it every time it is required, which leads to repetitive and less maintainable code.</p><p>Moreover, settings values—such as configuration parameters—should remain constant throughout the application&rsquo;s lifetime. This makes them ideal candidates for a <strong>singleton</strong> pattern.</p><p>Fortunately, this is easy to implement using <code>pydantic</code> and <code>injector</code>. Let’s start by creating a <code>settings.py</code> file that reads the polygon’s side length from a <code>.env</code> file.</p><p><code>.env</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-env data-lang=env><span style=display:flex><span>SIDE_LENGTH<span style=color:#f92672>=</span><span style=color:#ae81ff>5</span>
+</span></span></code></pre></div><p><code>settings.py</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>from</span> pydantic_settings <span style=color:#f92672>import</span> BaseSettings, SettingsConfigDict
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span><span style=color:#66d9ef>class</span> <span style=color:#a6e22e>Settings</span>(BaseSettings):
 </span></span><span style=display:flex><span>    model_config <span style=color:#f92672>=</span> SettingsConfigDict(env_file<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;.env&#34;</span>, extra<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;ignore&#34;</span>)
